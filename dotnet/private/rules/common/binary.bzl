@@ -50,13 +50,17 @@ def _create_launcher(ctx, runfiles, executable):
 
     launcher = ctx.actions.declare_file("{}.{}".format(executable.basename, "bat" if ctx.target_platform_has_constraint(windows_constraint) else "sh"), sibling = executable)
 
-    coverage_tool_path = toolchain.dotnetinfo.coverage_tool_path
-    coverage_enabled = "1" if coverage_tool_path else "0"
+    coverage_tool_files = toolchain.dotnetinfo.coverage_tool_files
+    coverage_enabled = "1" if coverage_tool_files else "0"
 
-    # rlocation resolves the empty string to a no-op path, so when no coverage
-    # tool is configured we still pass a valid (unused) placeholder so the
-    # launcher template substitution is well-formed.
-    coverage_tool_substitution = coverage_tool_path or "rules_dotnet/_no_coverage_tool"
+    # The toolchain stores a manifest-style path (external/<repo>/...) that's
+    # only valid in MANIFEST entries. Launchers use Bazel's rlocation runfiles
+    # library, which expects "<repo>/<path>" (no "external/" prefix). Recompute
+    # the rlocation path here from the actual File so the launcher can find the
+    # coverlet DLL at runtime.
+    coverage_tool_substitution = (
+        to_rlocation_path(ctx, coverage_tool_files[0]) if coverage_tool_files else "rules_dotnet/_no_coverage_tool"
+    )
 
     substitutions = {
         "TEMPLATED_dotnet": to_rlocation_path(ctx, runtime.files_to_run.executable),
@@ -81,8 +85,8 @@ def _create_launcher(ctx, runfiles, executable):
         )
 
     runfiles.extend(toolchain.dotnetinfo.runtime_files)
-    if coverage_tool_path:
-        runfiles.extend(toolchain.dotnetinfo.coverage_tool_files)
+    if coverage_tool_files:
+        runfiles.extend(coverage_tool_files)
 
     return launcher
 
