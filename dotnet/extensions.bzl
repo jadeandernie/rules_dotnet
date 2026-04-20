@@ -12,13 +12,14 @@ _ATTRS = {
     "dotnet_version": attr.string(
         doc = "Version of the .Net SDK",
     ),
-    "coverage_tool": attr.string(
-        doc = """Optional label string for a coverlet.console-compatible DLL.
+    "coverage_tool": attr.label(
+        doc = """Optional label for a coverlet.console-compatible DLL.
 
 When set, `bazel coverage` will route csharp_test/fsharp_test through
-`dotnet exec <coverage_tool>` to produce LCOV output. See the
-`coverage_tool` attribute on `dotnet_toolchain` for the contract.""",
-        default = "",
+`dotnet exec <coverage_tool>` to produce LCOV output. The label is resolved
+against the calling module's repo mapping, so user repos referenced via
+`use_repo` are valid (e.g. `@coverlet_console//:coverlet_dll`). See the
+`coverage_tool` attribute on `dotnet_toolchain` for the runtime contract.""",
     ),
 }
 
@@ -42,7 +43,12 @@ def _toolchain_extension(module_ctx):
                 ))
             else:
                 registrations[toolchain.name] = toolchain.dotnet_version
-                coverage_tools[toolchain.name] = toolchain.coverage_tool
+
+                # `attr.label` already resolves against the calling module's
+                # repo mapping, so the canonical "@@repo+//pkg:tgt" string we
+                # get from str(Label) is safe to embed in any other repo's
+                # BUILD file (in particular the dotnet SDK toolchain repo).
+                coverage_tools[toolchain.name] = str(toolchain.coverage_tool) if toolchain.coverage_tool else ""
     for name, dotnet_version in registrations.items():
         dotnet_register_toolchains(
             name = name,
