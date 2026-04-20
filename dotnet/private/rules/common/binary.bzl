@@ -44,33 +44,45 @@ def _collect_native_dlls(assembly_runtime_info, deps):
     return result
 
 def _create_launcher(ctx, runfiles, executable):
-    runtime = get_toolchain(ctx).runtime
+    toolchain = get_toolchain(ctx)
+    runtime = toolchain.runtime
     windows_constraint = ctx.attr._windows_constraint[platform_common.ConstraintValueInfo]
 
     launcher = ctx.actions.declare_file("{}.{}".format(executable.basename, "bat" if ctx.target_platform_has_constraint(windows_constraint) else "sh"), sibling = executable)
+
+    coverage_tool_path = toolchain.dotnetinfo.coverage_tool_path
+    coverage_enabled = "1" if coverage_tool_path else "0"
+
+    # rlocation resolves the empty string to a no-op path, so when no coverage
+    # tool is configured we still pass a valid (unused) placeholder so the
+    # launcher template substitution is well-formed.
+    coverage_tool_substitution = coverage_tool_path or "rules_dotnet/_no_coverage_tool"
+
+    substitutions = {
+        "TEMPLATED_dotnet": to_rlocation_path(ctx, runtime.files_to_run.executable),
+        "TEMPLATED_executable": to_rlocation_path(ctx, executable),
+        "TEMPLATED_coverage_enabled": coverage_enabled,
+        "TEMPLATED_coverage_tool": coverage_tool_substitution,
+    }
 
     if ctx.target_platform_has_constraint(windows_constraint):
         ctx.actions.expand_template(
             template = ctx.file._launcher_bat,
             output = launcher,
-            substitutions = {
-                "TEMPLATED_dotnet": to_rlocation_path(ctx, runtime.files_to_run.executable),
-                "TEMPLATED_executable": to_rlocation_path(ctx, executable),
-            },
+            substitutions = substitutions,
             is_executable = True,
         )
     else:
         ctx.actions.expand_template(
             template = ctx.file._launcher_sh,
             output = launcher,
-            substitutions = {
-                "TEMPLATED_dotnet": to_rlocation_path(ctx, runtime.files_to_run.executable),
-                "TEMPLATED_executable": to_rlocation_path(ctx, executable),
-            },
+            substitutions = substitutions,
             is_executable = True,
         )
 
-    runfiles.extend(get_toolchain(ctx).dotnetinfo.runtime_files)
+    runfiles.extend(toolchain.dotnetinfo.runtime_files)
+    if coverage_tool_path:
+        runfiles.extend(toolchain.dotnetinfo.coverage_tool_files)
 
     return launcher
 

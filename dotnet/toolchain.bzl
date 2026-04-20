@@ -21,6 +21,12 @@ May be empty if the fsharp_compiler_path points to a locally installed tool bina
         "apphost_files": """Files required in runfiles to make the apphost executable available.
 
 May be empty if the apphost_path points to a locally installed tool binary.""",
+        "coverage_tool_path": """Path to the coverage tool executable.
+
+Empty when the toolchain is not configured with a `coverage_tool`.""",
+        "coverage_tool_files": """Files required in runfiles to make the coverage tool available.
+
+Empty when the toolchain is not configured with a `coverage_tool`.""",
         "sdk_version": "Version of the dotnet SDK",
         "runtime_version": "Version of the dotnet runtime",
         "runtime_tfm": "The target framework moniker for the current SDK",
@@ -73,6 +79,13 @@ def _dotnet_toolchain_impl(ctx):
         fsharp_compiler_files = ctx.attr.fsharp_compiler.files.to_list() + ctx.attr.fsharp_compiler.default_runfiles.files.to_list()
         fsharp_compiler_path = _to_manifest_path(ctx, fsharp_compiler_files[0])
 
+    coverage_tool_files = []
+    coverage_tool_path = ""
+
+    if ctx.attr.coverage_tool:
+        coverage_tool_files = ctx.attr.coverage_tool.files.to_list() + ctx.attr.coverage_tool.default_runfiles.files.to_list()
+        coverage_tool_path = _to_manifest_path(ctx, coverage_tool_files[0])
+
     # Make the $(tool_BIN) variable available in places like genrules.
     # See https://docs.bazel.build/versions/main/be/make-variables.html#custom_variables
     template_variables = platform_common.TemplateVariableInfo({
@@ -96,6 +109,8 @@ def _dotnet_toolchain_impl(ctx):
         csharp_compiler_files = csharp_compiler_files,
         fsharp_compiler_path = fsharp_compiler_path,
         fsharp_compiler_files = fsharp_compiler_files,
+        coverage_tool_path = coverage_tool_path,
+        coverage_tool_files = coverage_tool_files,
         sdk_version = ctx.attr.sdk_version,
         runtime_version = ctx.attr.runtime_version,
         runtime_tfm = ctx.attr.runtime_tfm,
@@ -153,6 +168,20 @@ dotnet_toolchain = rule(
         "fsharp_compiler_path": attr.string(
             doc = "Path to the F# compiler binary. Do not set if `fsharp_compiler` is set",
             mandatory = False,
+        ),
+        "coverage_tool": attr.label(
+            doc = """An executable target used by `bazel coverage` to instrument .NET tests.
+
+When set, `csharp_test`/`fsharp_test` launchers will route through this tool when
+the `COVERAGE` environment variable is set by Bazel's coverage runner. The tool
+must accept a coverlet.console-compatible CLI: `<test.dll> --target <dotnet>
+--targetargs <args> --format lcov --output <path>`.
+
+Leave unset to disable coverage support; `bazel coverage` will then run tests
+normally without producing coverage data.""",
+            mandatory = False,
+            executable = True,
+            cfg = "exec",
         ),
         "host_model": attr.label(
             doc = "The System.NET.HostModel DLL",

@@ -5,6 +5,7 @@ This rule can be used to compile and run any C# binary and run it as
 a Bazel test.
 """
 
+load("@bazel_skylib//lib:dicts.bzl", "dicts")
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load(
     "//dotnet/private:common.bzl",
@@ -62,12 +63,32 @@ def _compile_action(ctx, tfm):
     )
 
 def _csharp_test_impl(ctx):
-    return build_binary(ctx, _compile_action)
+    return build_binary(ctx, _compile_action) + [
+        coverage_common.instrumented_files_info(
+            ctx,
+            source_attributes = ["srcs"],
+            dependency_attributes = ["deps"],
+        ),
+    ]
 
 csharp_test = rule(
     _csharp_test_impl,
-    doc = """Compiles a C# executable and runs it as a test""",
-    attrs = CSHARP_BINARY_COMMON_ATTRS,
+    doc = """Compiles a C# executable and runs it as a test.
+
+Supports `bazel coverage` when the dotnet toolchain is configured with a
+`coverage_tool` (e.g. coverlet.console). Coverage data is written as LCOV
+to the file referenced by Bazel's `COVERAGE_OUTPUT_FILE` environment
+variable.""",
+    attrs = dicts.add(
+        CSHARP_BINARY_COMMON_ATTRS,
+        {
+            "_lcov_merger": attr.label(
+                default = configuration_field(fragment = "coverage", name = "output_generator"),
+                executable = True,
+                cfg = "exec",
+            ),
+        },
+    ),
     test = True,
     toolchains = [
         "//dotnet:toolchain_type",
