@@ -170,17 +170,21 @@ dotnet_toolchain = rule(
             mandatory = False,
         ),
         "coverage_tool": attr.label(
-            doc = """An executable target used by `bazel coverage` to instrument .NET tests.
+            doc = """A coverlet.console DLL used by `bazel coverage` to instrument .NET tests.
 
-When set, `csharp_test`/`fsharp_test` launchers will route through this tool when
-the `COVERAGE` environment variable is set by Bazel's coverage runner. The tool
-must accept a coverlet.console-compatible CLI: `<test.dll> --target <dotnet>
---targetargs <args> --format lcov --output <path>`.
+When set, `csharp_test`/`fsharp_test` launchers will run
+
+    dotnet exec <coverage_tool> <test.dll> --target <dotnet> \\
+      --targetargs "exec <test.dll>" --format lcov --output $COVERAGE_OUTPUT_FILE
+
+whenever Bazel's coverage runner sets the `COVERAGE` environment variable. The
+target must produce a single coverlet.console-compatible DLL as its primary
+file (e.g. via `filegroup` over a NuGet-packaged coverlet.console binary).
 
 Leave unset to disable coverage support; `bazel coverage` will then run tests
 normally without producing coverage data.""",
             mandatory = False,
-            executable = True,
+            allow_single_file = True,
             cfg = "exec",
         ),
         "host_model": attr.label(

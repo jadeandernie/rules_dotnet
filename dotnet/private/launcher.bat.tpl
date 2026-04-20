@@ -65,11 +65,12 @@ if defined args (
 
 rem Coverage support: when Bazel runs `bazel coverage`, it sets COVERAGE=1 and
 rem expects the test action to write LCOV data to %COVERAGE_OUTPUT_FILE%. If
-rem the dotnet toolchain has been configured with a coverage_tool, route the
-rem invocation through it; otherwise fall back to the normal launcher path.
+rem the dotnet toolchain has been configured with a coverage_tool (a
+rem coverlet.console DLL), route the invocation through `dotnet exec
+rem coverlet.dll`; otherwise fall back to the normal launcher path.
 if "TEMPLATED_coverage_enabled"=="1" if defined COVERAGE (
   call :rlocation "TEMPLATED_coverage_tool" coverage_tool
-  "!coverage_tool!" "!run_script!" --target "!dotnet_executable!" --targetargs "exec !run_script! !args!" --format lcov --output "%COVERAGE_OUTPUT_FILE%"
+  "!dotnet_executable!" exec "!coverage_tool!" "!run_script!" --target "!dotnet_executable!" --targetargs "exec !run_script! !args!" --format lcov --output "%COVERAGE_OUTPUT_FILE%"
   exit /b !errorlevel!
 )
 

@@ -34,11 +34,11 @@ export DOTNET_ROOT="$(dirname $(rlocation TEMPLATED_dotnet))"
 
 # Coverage support: when Bazel runs `bazel coverage`, it sets COVERAGE=1 and
 # expects the test action to write LCOV data to $COVERAGE_OUTPUT_FILE. If the
-# dotnet toolchain has been configured with a coverage_tool (e.g.
-# coverlet.console), route the test invocation through it; otherwise fall back
-# to the normal launcher path.
+# dotnet toolchain has been configured with a coverage_tool (a coverlet.console
+# DLL), route the test invocation through `dotnet exec coverlet.dll`; otherwise
+# fall back to the normal launcher path.
 if [ "TEMPLATED_coverage_enabled" = "1" ] && [ -n "${COVERAGE:-}" ]; then
-  exec $(rlocation TEMPLATED_coverage_tool) \
+  exec $(rlocation TEMPLATED_dotnet) exec $(rlocation TEMPLATED_coverage_tool) \
     $(rlocation TEMPLATED_executable) \
     --target $(rlocation TEMPLATED_dotnet) \
     --targetargs "exec $(rlocation TEMPLATED_executable) $*" \
