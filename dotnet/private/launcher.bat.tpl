@@ -70,7 +70,10 @@ rem coverlet.console DLL), route the invocation through `dotnet exec
 rem coverlet.dll`; otherwise fall back to the normal launcher path.
 if "TEMPLATED_coverage_enabled"=="1" if defined COVERAGE (
   call :rlocation "TEMPLATED_coverage_tool" coverage_tool
-  "!dotnet_executable!" exec "!coverage_tool!" "!run_script!" --target "!dotnet_executable!" --targetargs "exec !run_script! !args!" --format lcov --output "%COVERAGE_OUTPUT_FILE%"
+  rem Pass the directory containing the test DLL so coverlet instruments every
+  rem assembly with a sibling .pdb (transitive deps), not just the test DLL.
+  for %%F in ("!run_script!") do set test_dir=%%~dpF
+  "!dotnet_executable!" exec "!coverage_tool!" "!test_dir!" --target "!dotnet_executable!" --targetargs "exec !run_script! !args!" --format lcov --output "%COVERAGE_OUTPUT_FILE%"
   exit /b !errorlevel!
 )
 

@@ -38,10 +38,16 @@ export DOTNET_ROOT="$(dirname $(rlocation TEMPLATED_dotnet))"
 # DLL), route the test invocation through `dotnet exec coverlet.dll`; otherwise
 # fall back to the normal launcher path.
 if [ "TEMPLATED_coverage_enabled" = "1" ] && [ -n "${COVERAGE:-}" ]; then
+  # Coverlet's positional <path> selects what to instrument. Passing the test
+  # DLL alone instruments only that assembly, so transitive code under test
+  # shows 0% coverage. Pass the directory containing the test DLL instead so
+  # coverlet picks up every assembly with a sibling .pdb (which is everything
+  # we ship to runfiles).
+  test_dll="$(rlocation TEMPLATED_executable)"
   exec $(rlocation TEMPLATED_dotnet) exec $(rlocation TEMPLATED_coverage_tool) \
-    $(rlocation TEMPLATED_executable) \
+    "$(dirname "$test_dll")" \
     --target $(rlocation TEMPLATED_dotnet) \
-    --targetargs "exec $(rlocation TEMPLATED_executable) $*" \
+    --targetargs "exec $test_dll $*" \
     --format lcov \
     --output "${COVERAGE_OUTPUT_FILE}"
 else
