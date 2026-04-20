@@ -336,7 +336,7 @@ def collect_transitive_runfiles(ctx, assembly_runtime_info, deps):
     Returns:
         A runfiles object that includes the transitive dependencies of the target
     """
-    runfiles = ctx.runfiles(files = assembly_runtime_info.data + assembly_runtime_info.native + assembly_runtime_info.xml_docs + assembly_runtime_info.libs + assembly_runtime_info.resource_assemblies)
+    runfiles = ctx.runfiles(files = assembly_runtime_info.data + assembly_runtime_info.native + assembly_runtime_info.xml_docs + assembly_runtime_info.libs + assembly_runtime_info.pdbs + assembly_runtime_info.resource_assemblies)
 
     transitive_runfiles = []
     for dep in deps:
