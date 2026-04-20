@@ -38,14 +38,44 @@ export DOTNET_ROOT="$(dirname $(rlocation TEMPLATED_dotnet))"
 # DLL), route the test invocation through `dotnet exec coverlet.dll`; otherwise
 # fall back to the normal launcher path.
 if [ "TEMPLATED_coverage_enabled" = "1" ] && [ -n "${COVERAGE:-}" ]; then
-  # Coverlet's positional <path> selects what to instrument. Passing the test
-  # DLL alone instruments only that assembly, so transitive code under test
-  # shows 0% coverage. Pass the directory containing the test DLL instead so
-  # coverlet picks up every assembly with a sibling .pdb (which is everything
-  # we ship to runfiles).
   test_dll="$(rlocation TEMPLATED_executable)"
+  test_dir="$(dirname "$test_dll")"
+  workspace_runfiles="${RUNFILES_DIR:-${test_dll}.runfiles}/_main"
+
+  # Coverlet instruments by rewriting assemblies and PDBs in place. Bazel's
+  # runfiles tree exposes them as symlinks to immutable build outputs, so any
+  # write fails with "Permission denied". Materialize each first-party
+  # assembly+PDB as a writable copy (sandbox is writable, originals are not)
+  # so coverlet can do its in-place IL rewrite.
+  if [ -d "$workspace_runfiles" ]; then
+    while IFS= read -r f; do
+      if [ -L "$f" ]; then
+        target=$(readlink "$f")
+        rm "$f"
+        cp "$target" "$f"
+        chmod u+w "$f"
+      else
+        chmod u+w "$f" 2>/dev/null || true
+      fi
+    done < <(find "$workspace_runfiles" \( -name '*.dll' -o -name '*.pdb' \) -print)
+  fi
+
+  # Bazel scatters each transitive .NET dependency under its own runfiles
+  # directory rather than co-locating them next to the test DLL. Coverlet
+  # instruments only the directory passed as <path> plus any directories
+  # listed via --include-directory, so enumerate every workspace runfiles
+  # dir that contains a .pdb (== our own first-party code) and add it.
+  include_dir_args=()
+  if [ -d "$workspace_runfiles" ]; then
+    while IFS= read -r dir; do
+      [ "$dir" = "$test_dir" ] && continue
+      include_dir_args+=("--include-directory" "$dir")
+    done < <(find "$workspace_runfiles" -name '*.pdb' -exec dirname {} \; | sort -u)
+  fi
+
   exec $(rlocation TEMPLATED_dotnet) exec $(rlocation TEMPLATED_coverage_tool) \
-    "$(dirname "$test_dll")" \
+    "$test_dir" \
+    "${include_dir_args[@]}" \
     --target $(rlocation TEMPLATED_dotnet) \
     --targetargs "exec $test_dll $*" \
     --format lcov \
