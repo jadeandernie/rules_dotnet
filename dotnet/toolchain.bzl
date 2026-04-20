@@ -170,21 +170,26 @@ dotnet_toolchain = rule(
             mandatory = False,
         ),
         "coverage_tool": attr.label(
-            doc = """A coverlet.console DLL used by `bazel coverage` to instrument .NET tests.
+            doc = """A target providing a coverlet.console DLL used by `bazel coverage`.
 
 When set, `csharp_test`/`fsharp_test` launchers will run
 
-    dotnet exec <coverage_tool> <test.dll> --target <dotnet> \\
+    dotnet exec <coverage_tool_dll> <test.dll> --target <dotnet> \\
       --targetargs "exec <test.dll>" --format lcov --output $COVERAGE_OUTPUT_FILE
 
-whenever Bazel's coverage runner sets the `COVERAGE` environment variable. The
-target must produce a single coverlet.console-compatible DLL as its primary
-file (e.g. via `filegroup` over a NuGet-packaged coverlet.console binary).
+whenever Bazel's coverage runner sets the `COVERAGE` environment variable.
+
+Contract for the target:
+
+  * The first file in its `DefaultInfo.files` is treated as the coverlet.console
+    DLL to invoke via `dotnet exec`.
+  * Any support assemblies, runtimeconfig.json, and other files required at
+    runtime must be exposed via the target's runfiles (e.g. by listing them in
+    a filegroup's `data` attribute).
 
 Leave unset to disable coverage support; `bazel coverage` will then run tests
 normally without producing coverage data.""",
             mandatory = False,
-            allow_single_file = True,
             cfg = "exec",
         ),
         "host_model": attr.label(
