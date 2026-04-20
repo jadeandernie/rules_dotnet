@@ -12,6 +12,11 @@ _DOC = "Fetch external tools needed for dotnet toolchain"
 _ATTRS = {
     "dotnet_version": attr.string(mandatory = True, values = TOOL_VERSIONS.keys()),
     "platform": attr.string(mandatory = True, values = PLATFORMS.keys()),
+    "coverage_tool": attr.string(
+        doc = "Optional label string for a coverlet.console DLL to use as the coverage tool.",
+        mandatory = False,
+        default = "",
+    ),
 }
 
 def _dotnet_repo_impl(repository_ctx):
@@ -82,7 +87,7 @@ dotnet_toolchain(
     runtime = ":runtime",
     csharp_compiler = ":csc_binary",
     fsharp_compiler = ":fsc_binary",
-    host_model = ":host_model",
+    host_model = ":host_model",{coverage_tool_attr}
     sdk_version = "{sdk_version}",
     runtime_version = "{runtime_version}",
     runtime_tfm = "{runtime_tfm}",
@@ -96,6 +101,7 @@ dotnet_toolchain(
         runtime_tfm = TOOL_VERSIONS[repository_ctx.attr.dotnet_version]["runtimeTfm"],
         csharp_default_version = TOOL_VERSIONS[repository_ctx.attr.dotnet_version]["csharpDefaultVersion"],
         fsharp_default_version = TOOL_VERSIONS[repository_ctx.attr.dotnet_version]["fsharpDefaultVersion"],
+        coverage_tool_attr = "\n    coverage_tool = \"{}\",".format(repository_ctx.attr.coverage_tool) if repository_ctx.attr.coverage_tool else "",
     )
 
     # Base BUILD file for this repository
@@ -124,11 +130,13 @@ def dotnet_register_toolchains(name, dotnet_version, register = True, **kwargs):
             Should be True for WORKSPACE users, but false when used under bzlmod extension
         **kwargs: passed to each dotnet_repositories call
     """
+    coverage_tool = kwargs.pop("coverage_tool", "")
     for platform in PLATFORMS.keys():
         dotnet_repositories(
             name = name + "_" + platform,
             platform = platform,
             dotnet_version = dotnet_version,
+            coverage_tool = coverage_tool,
             **kwargs
         )
         if register:

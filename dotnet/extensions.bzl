@@ -12,10 +12,19 @@ _ATTRS = {
     "dotnet_version": attr.string(
         doc = "Version of the .Net SDK",
     ),
+    "coverage_tool": attr.string(
+        doc = """Optional label string for a coverlet.console-compatible DLL.
+
+When set, `bazel coverage` will route csharp_test/fsharp_test through
+`dotnet exec <coverage_tool>` to produce LCOV output. See the
+`coverage_tool` attribute on `dotnet_toolchain` for the contract.""",
+        default = "",
+    ),
 }
 
 def _toolchain_extension(module_ctx):
     registrations = {}
+    coverage_tools = {}
     for mod in module_ctx.modules:
         for toolchain in mod.tags.toolchain:
             if toolchain.name in registrations.keys():
@@ -33,10 +42,12 @@ def _toolchain_extension(module_ctx):
                 ))
             else:
                 registrations[toolchain.name] = toolchain.dotnet_version
+                coverage_tools[toolchain.name] = toolchain.coverage_tool
     for name, dotnet_version in registrations.items():
         dotnet_register_toolchains(
             name = name,
             dotnet_version = dotnet_version,
+            coverage_tool = coverage_tools.get(name, ""),
             register = False,
         )
 
